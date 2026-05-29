@@ -309,6 +309,10 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
       settings.currentSettings.enableSpecialEpisodes
   );
 
+  const isAnime = data.keywords.some(
+    (keyword) => keyword.id === ANIME_KEYWORD_ID
+  );
+
   const isComplete =
     (showHasSpecials ? seasonCount + 1 : seasonCount) <=
     getAllRequestedSeasons(false).length;
@@ -786,7 +790,14 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
           <div className="flex w-full flex-col space-y-2">
             {data.seasons
               .slice()
-              .reverse()
+              .sort((a, b) => {
+                if (isAnime) {
+                  if (a.seasonNumber === 0) return 1;
+                  if (b.seasonNumber === 0) return -1;
+                  return a.seasonNumber - b.seasonNumber;
+                }
+                return b.seasonNumber - a.seasonNumber;
+              })
               .filter(
                 (season) =>
                   settings.currentSettings.enableSpecialEpisodes ||
