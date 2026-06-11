@@ -3,4 +3,4 @@ services:
   app:
     image: ${IMAGE:-localbuild:ci}
     ports:
-      - "127.0.0.1:5055:5055"
+      - '127.0.0.1:5055:5055'
