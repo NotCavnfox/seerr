@@ -129,6 +129,10 @@ jobs:
           # Routine stable-release syncs are zero-touch: merge when checks pass.
           # Feature PRs keep the human gate — this only touches sync/upstream-*.
           gh pr merge "$PR" --repo "$REPO" --auto --merge
+          # GITHUB_TOKEN-created PRs never fire pull_request workflows, so the
+          # required check would never report and auto-merge would stall —
+          # dispatch the CI gate on the branch explicitly.
+          gh workflow run fork-build-test.yml --repo "$REPO" --ref "$BRANCH"
 
       - name: Surface conflict as a tracking issue (and fail)
         if: steps.gate.outputs.up_to_date != 'true' && steps.rebase.outputs.status == 'conflict'
