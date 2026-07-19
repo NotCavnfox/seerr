@@ -22,7 +22,8 @@ const messages = defineMessages('components.StatusBadge', {
   notfound: 'Not Found',
   notfounddetail: 'Approved {time}, but no download has appeared in the queue',
   importfailed: 'Import Failed',
-  importfaileddetailfallback: 'The download failed to import into your library.',
+  importfaileddetailfallback:
+    'The download failed to import into your library.',
   stalled: 'Stalled',
   stalleddetail: 'Download progress last changed {time}',
 });
