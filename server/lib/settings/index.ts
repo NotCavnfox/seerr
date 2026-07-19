@@ -366,6 +366,7 @@ export type JobId =
   | 'jellyfin-full-scan'
   | 'image-cache-cleanup'
   | 'availability-sync'
+  | 'stale-request-sync'
   | 'process-blocklisted-tags';
 
 export interface AllSettings {
@@ -586,6 +587,9 @@ class Settings {
         },
         'availability-sync': {
           schedule: '0 0 5 * * *',
+        },
+        'stale-request-sync': {
+          schedule: '0 0 * * * *',
         },
         'download-sync': {
           schedule: '0 * * * * *',

@@ -57,6 +57,13 @@ interface QueueItem {
   status: string;
   trackedDownloadStatus: string;
   trackedDownloadState: string;
+  // Present when trackedDownloadStatus/State is warning or error (e.g. an
+  // import failure) — carries Radarr/Sonarr's own explanation of what went
+  // wrong with this queue item.
+  statusMessages?: {
+    title?: string;
+    messages?: string[];
+  }[];
   downloadId: string;
   protocol: string;
   downloadClient: string;

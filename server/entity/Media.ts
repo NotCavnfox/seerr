@@ -190,6 +190,15 @@ class Media {
   public downloadStatus?: DownloadingItem[] = [];
   public downloadStatus4k?: DownloadingItem[] = [];
 
+  /**
+   * Set when the stale-request sweep job (staleRequestSync) determines this
+   * media was approved and sent to Radarr/Sonarr but never showed up in the
+   * download queue. Not persisted — sourced from downloadTracker's in-memory
+   * flag, same pattern as downloadStatus above.
+   */
+  public neverFoundSince?: Date;
+  public neverFoundSince4k?: Date;
+
   public mediaUrl?: string;
   public mediaUrl4k?: string;
 
@@ -387,6 +396,21 @@ class Media {
         );
       }
     }
+  }
+
+  @AfterLoad()
+  public setNeverFoundStatus(): void {
+    // Guard against a stale flag lingering in memory after the media has
+    // moved on from PROCESSING (e.g. it became available, or was declined)
+    // between stale-request-sync sweeps.
+    this.neverFoundSince =
+      this.status === MediaStatus.PROCESSING
+        ? downloadTracker.getNeverFound(this.id, false)
+        : undefined;
+    this.neverFoundSince4k =
+      this.status4k === MediaStatus.PROCESSING
+        ? downloadTracker.getNeverFound(this.id, true)
+        : undefined;
   }
 }
 
