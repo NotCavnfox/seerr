@@ -1,0 +1,49 @@
+---
+# Temporary, one-off workflow: runs `pnpm format` on this branch and commits
+# the result. Not part of the fork's permanent CI - delete after use.
+name: (temp) Format fix
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    name: Run pnpm format and push
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: feat/stuck-request-status-badges
+          persist-credentials: true
+
+      - name: Pnpm Setup
+        uses: pnpm/action-setup@8912a9102ac27614460f54aedde9e1e7f9aec20d # v6.0.5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version-file: 'package.json'
+
+      - name: Install dependencies
+        env:
+          CI: true
+        run: pnpm install
+
+      - name: Run format
+        run: pnpm format
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No formatting changes needed."
+          else
+            git add -A -- ':!.github/workflows/_tmp-format-fix.yml'
+            git commit -m "style: pnpm format"
+            git push origin HEAD:feat/stuck-request-status-badges
+          fi
