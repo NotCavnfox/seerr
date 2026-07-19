@@ -559,6 +559,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
               mediaType="tv"
               plexUrl={plexUrl}
               serviceUrl={data.mediaInfo?.serviceUrl}
+              neverFoundSince={data.mediaInfo?.neverFoundSince}
             />
             {settings.currentSettings.series4kEnabled &&
               hasPermission(
@@ -583,6 +584,7 @@ const TvDetails = ({ tv }: TvDetailsProps) => {
                   mediaType="tv"
                   plexUrl={plexUrl4k}
                   serviceUrl={data.mediaInfo?.serviceUrl4k}
+                  neverFoundSince={data.mediaInfo?.neverFoundSince4k}
                 />
               )}
           </div>

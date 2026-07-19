@@ -9,7 +9,7 @@ import defineMessages from '@app/utils/defineMessages';
 import { MediaStatus } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import type { DownloadingItem } from '@server/lib/downloadtracker';
-import { useIntl } from 'react-intl';
+import { FormattedRelativeTime, useIntl } from 'react-intl';
 
 const messages = defineMessages('components.StatusBadge', {
   status: '{status}',
@@ -19,6 +19,13 @@ const messages = defineMessages('components.StatusBadge', {
   managemedia: 'Manage {mediaType}',
   seasonnumber: 'S{seasonNumber}',
   seasonepisodenumber: 'S{seasonNumber}E{episodeNumber}',
+  notfound: 'Not Found',
+  notfounddetail: 'Approved {time}, but no download has appeared in the queue',
+  importfailed: 'Import Failed',
+  importfaileddetailfallback:
+    'The download failed to import into your library.',
+  stalled: 'Stalled',
+  stalleddetail: 'Download progress last changed {time}',
 });
 
 interface StatusBadgeProps {
@@ -32,6 +39,12 @@ interface StatusBadgeProps {
   mediaType?: 'movie' | 'tv';
   title?: string | string[];
   statusLabelOverride?: string;
+  /**
+   * Set when the media was approved and sent to Radarr/Sonarr but has never
+   * shown up in that server's download queue (see staleRequestSync). Only
+   * meaningful for MediaStatus.PROCESSING.
+   */
+  neverFoundSince?: Date;
 }
 
 const StatusBadge = ({
@@ -45,6 +58,7 @@ const StatusBadge = ({
   mediaType,
   title,
   statusLabelOverride,
+  neverFoundSince,
 }: StatusBadgeProps) => {
   const intl = useIntl();
   const { hasPermission } = useUser();
@@ -153,6 +167,82 @@ const StatusBadge = ({
       }}
     />
   );
+
+  // Detects the three "stuck request" sub-states for MediaStatus.PROCESSING:
+  // never found (nothing ever entered the queue), import failed (Radarr/
+  // Sonarr flagged the queue item warning/error), or stalled (queue item
+  // hasn't made progress in a while). Returns undefined when everything
+  // looks normal, in which case PROCESSING renders as it always has.
+  const downloadIssue = (() => {
+    if (status !== MediaStatus.PROCESSING) {
+      return undefined;
+    }
+
+    if (downloadItem.length === 0 && neverFoundSince) {
+      return {
+        label: intl.formatMessage(messages.notfound),
+        badgeType: 'danger' as const,
+        tooltip: intl.formatMessage(messages.notfounddetail, {
+          time: (
+            <FormattedRelativeTime
+              value={Math.floor(
+                (new Date(neverFoundSince).getTime() - Date.now()) / 1000
+              )}
+              updateIntervalInSeconds={60}
+              numeric="auto"
+            />
+          ),
+        }),
+      };
+    }
+
+    const importFailedItem = downloadItem.find(
+      (item) =>
+        item.trackedDownloadStatus === 'warning' ||
+        item.trackedDownloadStatus === 'error'
+    );
+
+    if (importFailedItem) {
+      const detail = importFailedItem.statusMessages
+        ?.flatMap((statusMessage) => statusMessage.messages ?? [])
+        .join(' ');
+
+      return {
+        label: intl.formatMessage(messages.importfailed),
+        badgeType: 'danger' as const,
+        tooltip:
+          detail && detail.length > 0
+            ? detail
+            : intl.formatMessage(messages.importfaileddetailfallback),
+      };
+    }
+
+    const stalledItem = downloadItem.find((item) => item.isStalled);
+
+    if (stalledItem) {
+      return {
+        label: intl.formatMessage(messages.stalled),
+        badgeType: 'warning' as const,
+        tooltip: intl.formatMessage(messages.stalleddetail, {
+          time: (
+            <FormattedRelativeTime
+              value={Math.floor(
+                (new Date(
+                  stalledItem.lastProgressChangeAt ?? new Date()
+                ).getTime() -
+                  Date.now()) /
+                  1000
+              )}
+              updateIntervalInSeconds={60}
+              numeric="auto"
+            />
+          ),
+        }),
+      };
+    }
+
+    return undefined;
+  })();
 
   switch (status) {
     case MediaStatus.AVAILABLE:
@@ -286,6 +376,18 @@ const StatusBadge = ({
       );
 
     case MediaStatus.PROCESSING:
+      if (downloadIssue) {
+        return (
+          <Tooltip content={downloadIssue.tooltip}>
+            <Badge badgeType={downloadIssue.badgeType} href={mediaLink}>
+              {intl.formatMessage(is4k ? messages.status4k : messages.status, {
+                status: downloadIssue.label,
+              })}
+            </Badge>
+          </Tooltip>
+        );
+      }
+
       return (
         <Tooltip
           content={inProgress ? tooltipContent : mediaLinkDescription}

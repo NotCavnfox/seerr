@@ -13,6 +13,7 @@ import { radarrScanner } from '@server/lib/scanners/radarr';
 import { sonarrScanner } from '@server/lib/scanners/sonarr';
 import type { JobId } from '@server/lib/settings';
 import { getSettings } from '@server/lib/settings';
+import staleRequestSync from '@server/lib/staleRequestSync';
 import watchlistSync from '@server/lib/watchlistsync';
 import logger from '@server/logger';
 import schedule from 'node-schedule';
@@ -192,6 +193,24 @@ export const startJobs = (): void => {
     }),
     running: () => availabilitySync.running,
     cancelFn: () => availabilitySync.cancel(),
+  });
+
+  // Sweeps PENDING/APPROVED requests whose media never showed up in the
+  // Radarr/Sonarr download queue, flagging them as "never found" for the UI
+  scheduledJobs.push({
+    id: 'stale-request-sync',
+    name: 'Stale Request Sync',
+    type: 'process',
+    interval: 'hours',
+    cronSchedule: jobs['stale-request-sync'].schedule,
+    job: schedule.scheduleJob(jobs['stale-request-sync'].schedule, () => {
+      logger.info('Starting scheduled job: Stale Request Sync', {
+        label: 'Jobs',
+      });
+      staleRequestSync.run();
+    }),
+    running: () => staleRequestSync.running,
+    cancelFn: () => staleRequestSync.cancel(),
   });
 
   // Run download sync every minute

@@ -11,6 +11,11 @@ interface EpisodeNumberResult {
   absoluteEpisodeNumber: number;
   id: number;
 }
+
+// A download that hasn't advanced (sizeLeft unchanged) for this long is
+// considered stalled.
+export const STALL_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 hours
+
 export interface DownloadingItem {
   mediaType: MediaType;
   externalId: number;
@@ -22,11 +27,36 @@ export interface DownloadingItem {
   title: string;
   downloadId: string;
   episode?: EpisodeNumberResult;
+  // Radarr/Sonarr's own queue-item status. 'warning'/'error' generally means
+  // an import failure (e.g. no files eligible for import).
+  trackedDownloadStatus?: string;
+  trackedDownloadState?: string;
+  statusMessages?: {
+    title?: string;
+    messages?: string[];
+  }[];
+  // Last time this item's sizeLeft changed across download-sync polls, and
+  // whether that's now >= STALL_THRESHOLD_MS ago.
+  lastProgressChangeAt?: Date;
+  isStalled?: boolean;
 }
 
 class DownloadTracker {
   private radarrServers: Record<number, DownloadingItem[]> = {};
   private sonarrServers: Record<number, DownloadingItem[]> = {};
+
+  // Keyed by `${radarr|sonarr}-${serverId}-${downloadId}`. Used to derive
+  // isStalled/lastProgressChangeAt across successive download-sync polls.
+  private progressHistory: Record<
+    string,
+    { sizeLeft: number; lastChanged: number }
+  > = {};
+
+  // Keyed by `${mediaId}-${std|4k}`. Set by the stale-request sweep job when
+  // a request has been approved and sent to Radarr/Sonarr but nothing has
+  // ever shown up in the queue. Cleared once the item shows up or the media
+  // is no longer PROCESSING.
+  private neverFoundMedia: Record<string, Date> = {};
 
   public getMovieProgress(
     serverId: number,
@@ -64,6 +94,56 @@ class DownloadTracker {
     this.updateSonarrDownloads();
   }
 
+  public setNeverFound(mediaId: number, is4k: boolean, since: Date): void {
+    this.neverFoundMedia[`${mediaId}-${is4k ? '4k' : 'std'}`] = since;
+  }
+
+  public clearNeverFound(mediaId: number, is4k: boolean): void {
+    delete this.neverFoundMedia[`${mediaId}-${is4k ? '4k' : 'std'}`];
+  }
+
+  public getNeverFound(mediaId: number, is4k: boolean): Date | undefined {
+    return this.neverFoundMedia[`${mediaId}-${is4k ? '4k' : 'std'}`];
+  }
+
+  /**
+   * Records the current sizeLeft for a queue item and reports whether it has
+   * been unchanged for at least STALL_THRESHOLD_MS.
+   */
+  private trackProgress(
+    key: string,
+    sizeLeft: number
+  ): { isStalled: boolean; lastChanged: Date } {
+    const now = Date.now();
+    const previous = this.progressHistory[key];
+
+    if (!previous || previous.sizeLeft !== sizeLeft) {
+      this.progressHistory[key] = { sizeLeft, lastChanged: now };
+      return { isStalled: false, lastChanged: new Date(now) };
+    }
+
+    return {
+      isStalled: now - previous.lastChanged >= STALL_THRESHOLD_MS,
+      lastChanged: new Date(previous.lastChanged),
+    };
+  }
+
+  /**
+   * Drops progress history entries that are no longer present in the latest
+   * queue poll for a given server, so the map doesn't grow unbounded as
+   * downloads complete or get removed from the queue.
+   */
+  private pruneProgressHistory(
+    keyPrefix: string,
+    activeKeys: Set<string>
+  ): void {
+    Object.keys(this.progressHistory).forEach((key) => {
+      if (key.startsWith(keyPrefix) && !activeKeys.has(key)) {
+        delete this.progressHistory[key];
+      }
+    });
+  }
+
   private async updateRadarrDownloads() {
     const settings = getSettings();
 
@@ -88,18 +168,36 @@ class DownloadTracker {
           try {
             await radarr.refreshMonitoredDownloads();
             const queueItems = await radarr.getQueue();
+            const activeProgressKeys = new Set<string>();
 
-            this.radarrServers[server.id] = queueItems.map((item) => ({
-              externalId: item.movieId,
-              estimatedCompletionTime: new Date(item.estimatedCompletionTime),
-              mediaType: MediaType.MOVIE,
-              size: item.size,
-              sizeLeft: item.sizeleft,
-              status: item.status,
-              timeLeft: item.timeleft,
-              title: item.title,
-              downloadId: item.downloadId,
-            }));
+            this.radarrServers[server.id] = queueItems.map((item) => {
+              const progressKey = `radarr-${server.id}-${item.downloadId}`;
+              activeProgressKeys.add(progressKey);
+              const progress = this.trackProgress(progressKey, item.sizeleft);
+
+              return {
+                externalId: item.movieId,
+                estimatedCompletionTime: new Date(
+                  item.estimatedCompletionTime
+                ),
+                mediaType: MediaType.MOVIE,
+                size: item.size,
+                sizeLeft: item.sizeleft,
+                status: item.status,
+                timeLeft: item.timeleft,
+                title: item.title,
+                downloadId: item.downloadId,
+                trackedDownloadStatus: item.trackedDownloadStatus,
+                trackedDownloadState: item.trackedDownloadState,
+                statusMessages: item.statusMessages,
+                lastProgressChangeAt: progress.lastChanged,
+                isStalled: progress.isStalled,
+              };
+            });
+            this.pruneProgressHistory(
+              `radarr-${server.id}-`,
+              activeProgressKeys
+            );
 
             if (queueItems.length > 0) {
               logger.debug(
@@ -166,19 +264,37 @@ class DownloadTracker {
           try {
             await sonarr.refreshMonitoredDownloads();
             const queueItems = await sonarr.getQueue();
+            const activeProgressKeys = new Set<string>();
 
-            this.sonarrServers[server.id] = queueItems.map((item) => ({
-              externalId: item.seriesId,
-              estimatedCompletionTime: new Date(item.estimatedCompletionTime),
-              mediaType: MediaType.TV,
-              size: item.size,
-              sizeLeft: item.sizeleft,
-              status: item.status,
-              timeLeft: item.timeleft,
-              title: item.title,
-              episode: item.episode,
-              downloadId: item.downloadId,
-            }));
+            this.sonarrServers[server.id] = queueItems.map((item) => {
+              const progressKey = `sonarr-${server.id}-${item.downloadId}`;
+              activeProgressKeys.add(progressKey);
+              const progress = this.trackProgress(progressKey, item.sizeleft);
+
+              return {
+                externalId: item.seriesId,
+                estimatedCompletionTime: new Date(
+                  item.estimatedCompletionTime
+                ),
+                mediaType: MediaType.TV,
+                size: item.size,
+                sizeLeft: item.sizeleft,
+                status: item.status,
+                timeLeft: item.timeleft,
+                title: item.title,
+                episode: item.episode,
+                downloadId: item.downloadId,
+                trackedDownloadStatus: item.trackedDownloadStatus,
+                trackedDownloadState: item.trackedDownloadState,
+                statusMessages: item.statusMessages,
+                lastProgressChangeAt: progress.lastChanged,
+                isStalled: progress.isStalled,
+              };
+            });
+            this.pruneProgressHistory(
+              `sonarr-${server.id}-`,
+              activeProgressKeys
+            );
 
             if (queueItems.length > 0) {
               logger.debug(
