@@ -32,16 +32,31 @@ describe('General Settings', () => {
 
   it('modifies setting that requires restart', () => {
     cy.intercept('POST', '/api/v1/settings/network').as('saveNetwork');
-    cy.intercept('GET', '/api/v1/status?checkUpdateAvailable=false').as(
-      'status'
-    );
+    cy.intercept('GET', '/api/v1/status?checkUpdateAvailable=false', (req) => {
+      // Express can return a bodyless 304 for unchanged status. Keep the real
+      // response body observable without replacing or mocking its contents.
+      delete req.headers['if-none-match'];
+      delete req.headers['if-modified-since'];
+      req.on('before:response', (res) => {
+        res.headers['cache-control'] = 'no-store';
+      });
+    }).as('status');
+    const waitForRestartStatus = (restartRequired: boolean) => {
+      cy.wait('@status').should(({ response }) => {
+        expect(response?.statusCode).to.eq(200);
+        expect(response?.body).to.have.property(
+          'restartRequired',
+          restartRequired
+        );
+      });
+    };
     cy.visit('/settings/network');
-    cy.wait('@status').its('response.body.restartRequired').should('eq', false);
+    waitForRestartStatus(false);
 
     cy.get('#trustProxy').click();
     cy.get('[data-testid=settings-network-form]').submit();
     cy.wait('@saveNetwork').its('response.statusCode').should('eq', 200);
-    cy.wait('@status').its('response.body.restartRequired').should('eq', true);
+    waitForRestartStatus(true);
     cy.get('[data-testid=modal-title]').should(
       'contain',
       'Server Restart Required'
@@ -53,12 +68,12 @@ describe('General Settings', () => {
     cy.get('[type=checkbox]#trustProxy').click();
     cy.get('[data-testid=settings-network-form]').submit();
     cy.wait('@saveNetwork').its('response.statusCode').should('eq', 200);
-    cy.wait('@status').its('response.body.restartRequired').should('eq', false);
+    waitForRestartStatus(false);
     cy.get('[data-testid=modal-title]').should('not.exist');
 
     // A fresh page must not reopen the restart prompt for later specs.
     cy.reload();
-    cy.wait('@status').its('response.body.restartRequired').should('eq', false);
+    waitForRestartStatus(false);
     cy.get('[data-testid=modal-title]').should('not.exist');
   });
 });
