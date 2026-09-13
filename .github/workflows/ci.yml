@@ -217,6 +217,7 @@ jobs:
           provenance: false
 
   publish:
+    if: github.repository == 'seerr-team/seerr'
     name: Publish multi-arch image
     needs: build
     runs-on: ubuntu-24.04
@@ -286,7 +287,7 @@ jobs:
   discord:
     name: Send Discord Notification
     needs: publish
-    if: always() && github.event_name != 'pull_request'
+    if: github.repository == 'seerr-team/seerr' && (always() && github.event_name != 'pull_request')
     runs-on: ubuntu-24.04
     steps:
       - name: Determine Workflow Status
