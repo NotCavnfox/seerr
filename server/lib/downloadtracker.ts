@@ -177,9 +177,7 @@ class DownloadTracker {
 
               return {
                 externalId: item.movieId,
-                estimatedCompletionTime: new Date(
-                  item.estimatedCompletionTime
-                ),
+                estimatedCompletionTime: new Date(item.estimatedCompletionTime),
                 mediaType: MediaType.MOVIE,
                 size: item.size,
                 sizeLeft: item.sizeleft,
@@ -273,9 +271,7 @@ class DownloadTracker {
 
               return {
                 externalId: item.seriesId,
-                estimatedCompletionTime: new Date(
-                  item.estimatedCompletionTime
-                ),
+                estimatedCompletionTime: new Date(item.estimatedCompletionTime),
                 mediaType: MediaType.TV,
                 size: item.size,
                 sizeLeft: item.sizeleft,

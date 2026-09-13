@@ -43,6 +43,7 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
 
   create-draft-release:
+    if: github.repository == 'seerr-team/seerr'
     name: Create draft release
     runs-on: ubuntu-24.04
     permissions:
@@ -104,6 +105,7 @@ jobs:
           provenance: false
 
   publish:
+    if: github.repository == 'seerr-team/seerr'
     name: Publish multi-arch manifests
     needs: build
     runs-on: ubuntu-24.04
@@ -194,6 +196,7 @@ jobs:
                 ghcr.io/${{ github.repository }}:${{ env.VERSION }}
 
   sign:
+    if: github.repository == 'seerr-team/seerr'
     name: Sign images and create SBOM attestations
     needs: publish
     runs-on: ubuntu-24.04
@@ -299,6 +302,7 @@ jobs:
                 --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 
   publish-release:
+    if: github.repository == 'seerr-team/seerr'
     name: Publish release
     needs: [create-draft-release, verify]
     runs-on: ubuntu-24.04
