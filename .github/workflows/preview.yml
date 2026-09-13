@@ -70,6 +70,7 @@ jobs:
           provenance: false
 
   publish:
+    if: github.repository == 'seerr-team/seerr'
     name: Publish multi-arch image
     needs: build
     runs-on: ubuntu-24.04
