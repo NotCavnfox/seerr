@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- This isolated fixture installs CommonJS dependency stubs before loading the real components. */
 // Run with Node 22: node --test test/request-card-status.test.cjs
 // Render the real request components and StatusBadge; isolate network/layout hooks.
 const assert = require('node:assert/strict');
@@ -65,8 +66,19 @@ mockDefault('next/link', ({ children }) => element('a', null, children));
 mockDefault('@app/components/Common/Button', ({ children }) =>
   element('button', null, children)
 );
+function childText(children) {
+  if (typeof children === 'string' || typeof children === 'number') {
+    return String(children);
+  }
+  if (Array.isArray(children)) {
+    return children.map(childText).join('');
+  }
+  return React.isValidElement(children)
+    ? childText(children.props.children)
+    : '';
+}
 mockDefault('@app/components/Common/Badge', ({ children }) =>
-  element('span', { 'data-status': true }, children)
+  element('span', { 'data-status': true }, childText(children))
 );
 mockDefault('@app/components/Common/Tooltip', ({ children, content }) =>
   element(
@@ -114,7 +126,7 @@ function render(component, props) {
 }
 function badges(html) {
   return [...html.matchAll(/<span data-status="true">(.*?)<\/span>/g)].map(
-    (match) => match[1].replace(/<[^>]*>/g, '')
+    (match) => match[1]
   );
 }
 function selected() {
