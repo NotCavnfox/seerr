@@ -20,7 +20,8 @@ const messages = defineMessages('components.StatusBadge', {
   seasonnumber: 'S{seasonNumber}',
   seasonepisodenumber: 'S{seasonNumber}E{episodeNumber}',
   notfound: 'Not Found',
-  notfounddetail: 'Approved {time}, but no download has appeared in the queue',
+  notfounddetail:
+    'No active download is currently reported for this request. A suitable copy may not be available from the server’s download sources. First noticed {time}.',
   importfailed: 'Import Failed',
   importfaileddetailfallback:
     'The download failed to import into your library.',

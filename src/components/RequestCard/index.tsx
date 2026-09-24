@@ -144,6 +144,13 @@ const RequestCardError = ({ requestData }: RequestCardErrorProps) => {
                     </Badge>
                   ) : (
                     <StatusBadge
+                      neverFoundSince={
+                        requestData.media[
+                          requestData.is4k
+                            ? 'neverFoundSince4k'
+                            : 'neverFoundSince'
+                        ]
+                      }
                       status={
                         requestData.media[
                           requestData.is4k ? 'status4k' : 'status'
@@ -454,6 +461,11 @@ const RequestCard = ({ request, onTitleData }: RequestCardProps) => {
               </Badge>
             ) : (
               <StatusBadge
+                neverFoundSince={
+                  requestData.media[
+                    requestData.is4k ? 'neverFoundSince4k' : 'neverFoundSince'
+                  ]
+                }
                 status={
                   requestData.media[requestData.is4k ? 'status4k' : 'status']
                 }
