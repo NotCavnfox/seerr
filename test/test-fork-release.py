@@ -133,6 +133,8 @@ os.execv(os.environ['REAL_GIT'], [os.environ['REAL_GIT']] + a)
                 'ci.yml': ['publish', 'discord'],
                 'release.yml': ['create-draft-release', 'publish', 'sign', 'publish-release'],
                 'preview.yml': ['publish'],
+                'helm.yml': ['publish'],
+                'docs-deploy.yml': ['deploy'],
             },
             'wizarrrr/wizarr': {
                 'ci.yml': ['docker-dev'],

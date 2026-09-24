@@ -10,6 +10,7 @@ import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import { quickConnectAuthLimiter } from '@server/middleware/quickConnectAuthLimiter';
 import { checkAvatarChanged } from '@server/routes/avatarproxy';
 import { ApiError } from '@server/types/error';
 import { getAppVersion } from '@server/utils/appVersion';
@@ -661,6 +662,7 @@ authRoutes.get('/jellyfin/quickconnect/check', async (req, res, next) => {
 
 authRoutes.post(
   '/jellyfin/quickconnect/authenticate',
+  quickConnectAuthLimiter,
   async (req, res, next) => {
     const settings = getSettings();
     const userRepository = getRepository(User);

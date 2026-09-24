@@ -66,6 +66,7 @@ jobs:
           path: gen-docs/build
 
   deploy:
+    if: github.repository == 'seerr-team/seerr'
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-24.04

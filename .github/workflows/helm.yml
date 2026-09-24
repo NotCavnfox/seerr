@@ -91,7 +91,7 @@ jobs:
       packages: write
       id-token: write
     needs: [package-helm-chart]
-    if: needs.package-helm-chart.outputs.has_artifacts == 'true'
+    if: github.repository == 'seerr-team/seerr' && (needs.package-helm-chart.outputs.has_artifacts == 'true')
     steps:
       - parallel:
           - name: Checkout
