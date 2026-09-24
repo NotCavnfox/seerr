@@ -87,6 +87,12 @@ const stream = run({
   testNamePatterns: opts.testNamePattern,
 });
 
+// Programmatic node:test reporting does not set the parent process exit code.
+// Preserve complete reporter output while making failed tests fail CI as well.
+stream.on('test:fail', () => {
+  process.exitCode = 1;
+});
+
 // In CI, write a JUnit report to a file for use by GitHub
 if (process.env.CI) {
   const reportStream = createWriteStream(join(BASE_DIR, 'report.xml'));
