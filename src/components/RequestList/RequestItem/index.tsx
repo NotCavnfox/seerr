@@ -134,6 +134,13 @@ const RequestItemError = ({
                   </Badge>
                 ) : (
                   <StatusBadge
+                    neverFoundSince={
+                      requestData.media[
+                        requestData.is4k
+                          ? 'neverFoundSince4k'
+                          : 'neverFoundSince'
+                      ]
+                    }
                     status={
                       requestData.media[
                         requestData.is4k ? 'status4k' : 'status'
@@ -537,6 +544,11 @@ const RequestItem = ({ request, revalidateList }: RequestItemProps) => {
                 </Badge>
               ) : (
                 <StatusBadge
+                  neverFoundSince={
+                    requestData.media[
+                      requestData.is4k ? 'neverFoundSince4k' : 'neverFoundSince'
+                    ]
+                  }
                   status={
                     requestData.media[requestData.is4k ? 'status4k' : 'status']
                   }
